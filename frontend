@@ -1,0 +1,32 @@
+"use client";
+import { useEffect, useState } from "react";
+
+export default function Home() {
+  const [colleges, setColleges] = useState([]);
+
+  useEffect(() => {
+    fetch("http://localhost:5000/colleges")
+      .then(res => res.json())
+      .then(data => setColleges(data))
+      .catch(err => console.error(err));
+  }, []);
+
+  return (
+    <div style={{ padding: "20px" }}>
+      <h1>🎓 College List</h1>
+
+      {colleges.length === 0 ? (
+        <p>Loading...</p>
+      ) : (
+        colleges.map((c: any) => (
+          <div key={c.id} style={{ border: "1px solid gray", margin: "10px", padding: "10px" }}>
+            <h3>{c.name}</h3>
+            <p>📍 {c.location}</p>
+            <p>💰 Fees: {c.fees}</p>
+            <p>⭐ Rating: {c.rating}</p>
+          </div>
+        ))
+      )}
+    </div>
+  );
+}
