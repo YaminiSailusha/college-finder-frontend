@@ -11,5 +11,5 @@ export default function Page() {
     return <Login onLogin={setUser} />;
   }
 
-  return <HomeClient user={user} />;
+  return <HomeClient />;
 }
