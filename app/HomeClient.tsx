@@ -17,42 +17,47 @@ export default function HomeClient() {
   const [sortBy, setSortBy] = useState("rating");
   const [selected, setSelected] = useState<string[]>([]);
   const [page, setPage] = useState(1);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
   const ITEMS_PER_PAGE = 5;
 
-  // ✅ FETCH DATA
+  // ✅ FETCH WITH RETRY (important for Render)
   useEffect(() => {
-    const fetchColleges = async () => {
+    const fetchColleges = async (retry = 3) => {
       try {
         const res = await fetch(
           "https://college-backend-hhe7.onrender.com/colleges"
         );
+
         const data = await res.json();
 
-        console.log("DATA:", data);
+        if (!Array.isArray(data)) throw new Error("Invalid data");
 
         setColleges(data);
         setFiltered(data);
+        setLoading(false);
       } catch (err) {
-        console.error("ERROR:", err);
+        if (retry > 0) {
+          setTimeout(() => fetchColleges(retry - 1), 2000);
+        } else {
+          setError("Failed to load colleges. Try again.");
+          setLoading(false);
+        }
       }
     };
 
     fetchColleges();
   }, []);
 
-  // ✅ SEARCH
+  // ✅ SEARCH + SORT
   useEffect(() => {
     let result = colleges.filter((c) =>
       c.name.toLowerCase().includes(search.toLowerCase())
     );
 
-    // ✅ SORT
-    if (sortBy === "rating") {
-      result.sort((a, b) => b.rating - a.rating);
-    } else if (sortBy === "fees") {
-      result.sort((a, b) => a.fees - b.fees);
-    }
+    if (sortBy === "rating") result.sort((a, b) => b.rating - a.rating);
+    if (sortBy === "fees") result.sort((a, b) => a.fees - b.fees);
 
     setFiltered(result);
     setPage(1);
@@ -61,15 +66,12 @@ export default function HomeClient() {
   // ✅ PAGINATION
   const start = (page - 1) * ITEMS_PER_PAGE;
   const paginated = filtered.slice(start, start + ITEMS_PER_PAGE);
-
   const totalPages = Math.ceil(filtered.length / ITEMS_PER_PAGE);
 
-  // ✅ SELECT COLLEGES
+  // ✅ SELECT
   const toggleSelect = (id: string) => {
     setSelected((prev) =>
-      prev.includes(id)
-        ? prev.filter((x) => x !== id)
-        : [...prev, id]
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
     );
   };
 
@@ -78,45 +80,54 @@ export default function HomeClient() {
   );
 
   return (
-    <div className="p-6 text-white bg-gray-900 min-h-screen">
-      <h1 className="text-2xl font-bold mb-4">🎓 College Finder</h1>
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 to-gray-800 text-white p-6">
+      
+      <h1 className="text-3xl font-bold mb-6 text-center">
+        🎓 College Finder
+      </h1>
 
       {/* SEARCH */}
       <input
         type="text"
         placeholder="Search college..."
-        className="p-2 mb-4 w-full text-black"
+        className="w-full p-3 mb-4 rounded bg-gray-200 text-black"
         value={search}
         onChange={(e) => setSearch(e.target.value)}
       />
 
       {/* SORT */}
-      <div className="mb-4">
+      <div className="mb-4 text-center">
         Sort By:{" "}
         <select
           value={sortBy}
           onChange={(e) => setSortBy(e.target.value)}
-          className="text-black p-1"
+          className="text-black p-2 rounded"
         >
           <option value="rating">Rating</option>
           <option value="fees">Fees</option>
         </select>
       </div>
 
-      {/* LIST */}
-      {paginated.length === 0 ? (
-        <p>Loading colleges...</p>
-      ) : (
-        <div>
+      {/* STATUS */}
+      {loading && <p className="text-center">⏳ Loading colleges...</p>}
+      {error && <p className="text-center text-red-400">{error}</p>}
+
+      {/* COLLEGE LIST */}
+      {!loading && !error && (
+        <div className="grid gap-4">
           {paginated.map((college) => (
             <div
               key={college.id}
-              className="p-3 mb-2 border border-gray-600 rounded flex justify-between"
+              className="bg-gray-700 p-4 rounded-xl shadow-lg flex justify-between items-center hover:scale-105 transition"
             >
               <div>
-                <h2 className="font-semibold">{college.name}</h2>
-                <p>{college.location}</p>
-                <p>₹ {college.fees}</p>
+                <h2 className="text-lg font-semibold">
+                  {college.name}
+                </h2>
+                <p className="text-sm text-gray-300">
+                  📍 {college.location}
+                </p>
+                <p>💰 ₹ {college.fees}</p>
                 <p>⭐ {college.rating}</p>
               </div>
 
@@ -131,54 +142,60 @@ export default function HomeClient() {
       )}
 
       {/* PAGINATION */}
-      <div className="mt-4">
-        <button
-          onClick={() => setPage(page - 1)}
-          disabled={page === 1}
-          className="mr-2"
-        >
-          Prev
-        </button>
+      {!loading && (
+        <div className="mt-6 text-center">
+          <button
+            onClick={() => setPage(page - 1)}
+            disabled={page === 1}
+            className="px-4 py-2 bg-gray-600 rounded mr-2"
+          >
+            Prev
+          </button>
 
-        Page {page}
+          Page {page}
 
-        <button
-          onClick={() => setPage(page + 1)}
-          disabled={page === totalPages}
-          className="ml-2"
-        >
-          Next
-        </button>
-      </div>
+          <button
+            onClick={() => setPage(page + 1)}
+            disabled={page === totalPages}
+            className="px-4 py-2 bg-gray-600 rounded ml-2"
+          >
+            Next
+          </button>
+        </div>
+      )}
 
       {/* COMPARE */}
-      <div className="mt-6">
-        <h2 className="text-xl font-bold">Compare Colleges</h2>
+      <div className="mt-8">
+        <h2 className="text-xl font-bold mb-2">
+          📊 Compare Colleges
+        </h2>
 
         {selectedColleges.length === 0 ? (
           <p>No colleges selected</p>
         ) : (
-          <table className="mt-2 border border-gray-600">
-            <thead>
-              <tr>
-                <th className="p-2">Name</th>
-                <th className="p-2">Location</th>
-                <th className="p-2">Fees</th>
-                <th className="p-2">Rating</th>
-              </tr>
-            </thead>
-
-            <tbody>
-              {selectedColleges.map((c) => (
-                <tr key={c.id}>
-                  <td className="p-2">{c.name}</td>
-                  <td className="p-2">{c.location}</td>
-                  <td className="p-2">₹ {c.fees}</td>
-                  <td className="p-2">⭐ {c.rating}</td>
+          <div className="overflow-x-auto">
+            <table className="w-full border border-gray-600">
+              <thead>
+                <tr className="bg-gray-600">
+                  <th className="p-2">Name</th>
+                  <th className="p-2">Location</th>
+                  <th className="p-2">Fees</th>
+                  <th className="p-2">Rating</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+
+              <tbody>
+                {selectedColleges.map((c) => (
+                  <tr key={c.id} className="text-center">
+                    <td className="p-2">{c.name}</td>
+                    <td>{c.location}</td>
+                    <td>₹ {c.fees}</td>
+                    <td>⭐ {c.rating}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
     </div>
