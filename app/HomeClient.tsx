@@ -1,194 +1,186 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+
+type College = {
+  id: string;
+  name: string;
+  location: string;
+  fees: number;
+  rating: number;
+};
 
 export default function HomeClient() {
-  const [colleges, setColleges] = useState<any[]>([]);
+  const [colleges, setColleges] = useState<College[]>([]);
+  const [filtered, setFiltered] = useState<College[]>([]);
   const [search, setSearch] = useState("");
-  const [selected, setSelected] = useState<any[]>([]);
-  const [favorites, setFavorites] = useState<number[]>([]);
   const [sortBy, setSortBy] = useState("rating");
+  const [selected, setSelected] = useState<string[]>([]);
   const [page, setPage] = useState(1);
 
-  const router = useRouter();
-  const perPage = 3;
+  const ITEMS_PER_PAGE = 5;
 
-  // ✅ Fetch data
+  // ✅ FETCH DATA
   useEffect(() => {
-    fetch("http://localhost:5000/colleges")
-      .then((res) => res.json())
-      .then((data) => setColleges(data));
+    const fetchColleges = async () => {
+      try {
+        const res = await fetch(
+          "https://college-backend-hhe7.onrender.com/colleges"
+        );
+        const data = await res.json();
+
+        console.log("DATA:", data);
+
+        setColleges(data);
+        setFiltered(data);
+      } catch (err) {
+        console.error("ERROR:", err);
+      }
+    };
+
+    fetchColleges();
   }, []);
 
-  // ✅ Select colleges
-  const handleSelect = (college: any) => {
-    if (selected.some((c) => c.id === college.id)) {
-      setSelected(selected.filter((c) => c.id !== college.id));
-    } else {
-      setSelected([...selected, college]);
+  // ✅ SEARCH
+  useEffect(() => {
+    let result = colleges.filter((c) =>
+      c.name.toLowerCase().includes(search.toLowerCase())
+    );
+
+    // ✅ SORT
+    if (sortBy === "rating") {
+      result.sort((a, b) => b.rating - a.rating);
+    } else if (sortBy === "fees") {
+      result.sort((a, b) => a.fees - b.fees);
     }
+
+    setFiltered(result);
+    setPage(1);
+  }, [search, sortBy, colleges]);
+
+  // ✅ PAGINATION
+  const start = (page - 1) * ITEMS_PER_PAGE;
+  const paginated = filtered.slice(start, start + ITEMS_PER_PAGE);
+
+  const totalPages = Math.ceil(filtered.length / ITEMS_PER_PAGE);
+
+  // ✅ SELECT COLLEGES
+  const toggleSelect = (id: string) => {
+    setSelected((prev) =>
+      prev.includes(id)
+        ? prev.filter((x) => x !== id)
+        : [...prev, id]
+    );
   };
 
-  // ✅ Favorites
-  const toggleFavorite = (id: number) => {
-    if (favorites.includes(id)) {
-      setFavorites(favorites.filter((f) => f !== id));
-    } else {
-      setFavorites([...favorites, id]);
-    }
-  };
-
-  // ✅ Search
-  const filtered = colleges.filter((c) =>
-    c.name.toLowerCase().includes(search.toLowerCase())
-  );
-
-  // ✅ Sorting
-  const sorted = [...filtered].sort((a, b) => {
-    if (sortBy === "fees") return a.fees - b.fees;
-    if (sortBy === "rating") return b.rating - a.rating;
-    return 0;
-  });
-
-  // ✅ Pagination
-  const paginated = sorted.slice(
-    (page - 1) * perPage,
-    page * perPage
+  const selectedColleges = colleges.filter((c) =>
+    selected.includes(c.id)
   );
 
   return (
-    <div
-      style={{
-        background: "#111",
-        minHeight: "100vh",
-        padding: "20px",
-        color: "white",
-      }}
-    >
-      <h2>🎓 College Finder</h2>
+    <div className="p-6 text-white bg-gray-900 min-h-screen">
+      <h1 className="text-2xl font-bold mb-4">🎓 College Finder</h1>
 
-      {/* 🔍 Search */}
+      {/* SEARCH */}
       <input
         type="text"
         placeholder="Search college..."
+        className="p-2 mb-4 w-full text-black"
         value={search}
         onChange={(e) => setSearch(e.target.value)}
-        style={{
-          padding: "10px",
-          margin: "10px 0",
-          width: "250px",
-          borderRadius: "8px",
-        }}
       />
 
-      {/* 🔽 Sorting */}
-      <div style={{ marginBottom: "10px" }}>
-        Sort By:
+      {/* SORT */}
+      <div className="mb-4">
+        Sort By:{" "}
         <select
+          value={sortBy}
           onChange={(e) => setSortBy(e.target.value)}
-          style={{ marginLeft: "10px" }}
+          className="text-black p-1"
         >
           <option value="rating">Rating</option>
           <option value="fees">Fees</option>
         </select>
       </div>
 
-      {/* 📋 College List */}
-      {paginated.map((c) => (
-        <div
-          key={c.id}
-          style={{
-            padding: "10px",
-            margin: "5px 0",
-            background: "#222",
-            borderRadius: "10px",
-            cursor: "pointer",
-          }}
-        >
-          {/* Click to open detail */}
-          <div onClick={() => router.push(`/college/${c.id}`)}>
-            <input
-              type="checkbox"
-              checked={selected.some((s) => s.id === c.id)}
-              onChange={() => handleSelect(c)}
-            />
-            {"  "}
-            {c.name} - {c.location}
-          </div>
+      {/* LIST */}
+      {paginated.length === 0 ? (
+        <p>Loading colleges...</p>
+      ) : (
+        <div>
+          {paginated.map((college) => (
+            <div
+              key={college.id}
+              className="p-3 mb-2 border border-gray-600 rounded flex justify-between"
+            >
+              <div>
+                <h2 className="font-semibold">{college.name}</h2>
+                <p>{college.location}</p>
+                <p>₹ {college.fees}</p>
+                <p>⭐ {college.rating}</p>
+              </div>
 
-          {/* ❤️ Favorite */}
-          <button onClick={() => toggleFavorite(c.id)}>
-            {favorites.includes(c.id) ? "❤️" : "🤍"}
-          </button>
-
-          {/* 🏆 Ranking */}
-          <span
-            style={{
-              marginLeft: "10px",
-              background: "gold",
-              padding: "3px 6px",
-              borderRadius: "5px",
-              color: "black",
-            }}
-          >
-            #{c.ranking}
-          </span>
+              <input
+                type="checkbox"
+                checked={selected.includes(college.id)}
+                onChange={() => toggleSelect(college.id)}
+              />
+            </div>
+          ))}
         </div>
-      ))}
+      )}
 
-      {/* 📄 Pagination */}
-      <div style={{ marginTop: "10px" }}>
-        <button onClick={() => setPage(page - 1)} disabled={page === 1}>
+      {/* PAGINATION */}
+      <div className="mt-4">
+        <button
+          onClick={() => setPage(page - 1)}
+          disabled={page === 1}
+          className="mr-2"
+        >
           Prev
         </button>
 
-        <span style={{ margin: "0 10px" }}>Page {page}</span>
+        Page {page}
 
         <button
           onClick={() => setPage(page + 1)}
-          disabled={page * perPage >= sorted.length}
+          disabled={page === totalPages}
+          className="ml-2"
         >
           Next
         </button>
       </div>
 
-      {/* 📊 Compare */}
-      <h3 style={{ marginTop: "20px" }}>Compare Colleges</h3>
+      {/* COMPARE */}
+      <div className="mt-6">
+        <h2 className="text-xl font-bold">Compare Colleges</h2>
 
-      {selected.length === 0 ? (
-        <p>No colleges selected</p>
-      ) : (
-        <table
-          border={1}
-          cellPadding={10}
-          style={{
-            marginTop: "10px",
-            borderCollapse: "collapse",
-            width: "100%",
-          }}
-        >
-          <thead>
-            <tr>
-              <th>Name</th>
-              <th>Location</th>
-              <th>Fees</th>
-              <th>Rating</th>
-            </tr>
-          </thead>
-
-          <tbody>
-            {selected.map((c) => (
-              <tr key={c.id}>
-                <td>{c.name}</td>
-                <td>{c.location}</td>
-                <td>₹ {c.fees}</td>
-                <td>{c.rating}</td>
+        {selectedColleges.length === 0 ? (
+          <p>No colleges selected</p>
+        ) : (
+          <table className="mt-2 border border-gray-600">
+            <thead>
+              <tr>
+                <th className="p-2">Name</th>
+                <th className="p-2">Location</th>
+                <th className="p-2">Fees</th>
+                <th className="p-2">Rating</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
+            </thead>
+
+            <tbody>
+              {selectedColleges.map((c) => (
+                <tr key={c.id}>
+                  <td className="p-2">{c.name}</td>
+                  <td className="p-2">{c.location}</td>
+                  <td className="p-2">₹ {c.fees}</td>
+                  <td className="p-2">⭐ {c.rating}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
     </div>
   );
 }
